@@ -58,7 +58,8 @@ function setup() {
 	carAni.pause();
 
 	cityAni = loadAni(cityAnim, {width: 768, height: 512, frames: 1});
-
+	cityAni.scale.x = 2	;
+	cityAni.scale.y = 1.2;
 	vanAnchorX = (windowWidth / 2);
 	vanAnchorY = windowHeight - roadAni.height / 2;
 	//roadAni.scale.y = 2;
@@ -75,60 +76,13 @@ function update() {
 		image(roadMarkers, (windowWidth / 2), windowHeight - (roadAni.height * roadAni.scale.y) + roadMarkersY, 8, 768)
 		roadMarkersY += lerp(1, 10, van.speed / 200);
 		
-		animation(cityAni, (windowWidth / 2), 0);
+		animation(cityAni, (windowWidth / 2), (cityAni.height * cityAni.scale.y) / 8);
 		
 		// DEBUG TEXT
 		text(van.acceleration, 12, 30, 20, 6);
 		text(van.speed, 12, 50, 20, 6);
 
-		// update van animation frame and direction based off button press
-		if (kb.pressing('ArrowLeft')) {
-			if (van.direction != DIRECTION.LEFT) {
-				buttonHeldTime = 0;
-				van.direction  = DIRECTION.LEFT;
-				ani.frame = 0;
-			}
-			// update position based on how long button has been pressed
-			van.vanX -= min(0.2 * buttonHeldTime, 10);
-			buttonHeldTime++; // 
-		}
-		else if (kb.pressing('ArrowRight')) {
-			if (van.direction != DIRECTION.RIGHT) {
-				buttonHeldTime = 0;
-				van.direction  = DIRECTION.RIGHT;
-				ani.frame = 2;
-			}
-			van.vanX += min(0.2 * buttonHeldTime, 10);
-			buttonHeldTime++;
-		}
-		else {
-			if (van.direction != DIRECTION.CENTER) {
-				buttonHeldTime = 0;
-				van.direction  = DIRECTION.CENTER;
-				ani.frame = 1;
-			}
-		}
-
-		// add or remove acceleration based on button press
-		if (kb.pressing('ArrowUp')) {
-			van.acceleration = min(van.acceleration + 0.01, 0.5);
-			van.vanY -= van.acceleration;
-		} 
-		else if (kb.pressing('ArrowDown')) {
-			van.acceleration = max(van.acceleration - 0.01, -0.5);
-			van.vanY -= van.acceleration;
-		} 
-		else {
-			// kinda lerp to acceleration to 0 if button not pressed
-			if (van.acceleration > 0) {
-				van.acceleration = max(van.acceleration - 0.1, 0);
-			} 
-			else if (van.acceleration < 0) {
-				van.acceleration = min(van.acceleration + 0.1, 0);
-			}
-			// return to middle smoothly
-			van.vanY += (0 - van.vanY) * 0.05; 
-		}
+		handleButtonPress()
 		
 		// set van speed based of acceleration
 		van.speed = constrain(van.speed + van.acceleration, minSpeed, maxSpeed);
@@ -159,10 +113,11 @@ function update() {
 			// Draw obstacle
 			//fill('red');
 			carAni.frame = obs.spriteIndex;
+			
 			animation(carAni, obs.x, obs.y);
 		
 			// Remove if offscreen
-			if (obs.y + obs.height < windowHeight / 2 - 128) {
+			if (obs.y + obs.height < windowHeight - (roadAni.height * roadAni.scale.y)) {
 				obstacleCars.splice(i, 1);
 			}
 		}
@@ -173,6 +128,7 @@ function spawnObstacle() {
 	const laneOffsets = [-windowWidth / 4, 0, windowWidth / 4]; // LEFT, CENTER, RIGHT lanes
 	let lane = floor(random(0, 3));
 	let obs = {
+		//sprite: new Sprite(),
 		x: (windowWidth / 2) + laneOffsets[lane],
 		y: windowHeight + 50,
 		width: 60,
@@ -181,4 +137,55 @@ function spawnObstacle() {
 		spriteIndex: round(random(0, 3))
 	};
 	obstacleCars.push(obs);
+}
+
+function handleButtonPress () {
+	// update van animation frame and direction based off button press
+	if (kb.pressing('ArrowLeft')) {
+		if (van.direction != DIRECTION.LEFT) {
+			buttonHeldTime = 0;
+			van.direction  = DIRECTION.LEFT;
+			ani.frame = 0;
+		}
+		// update position based on how long button has been pressed
+		van.vanX -= min(0.2 * buttonHeldTime, 10);
+		buttonHeldTime++; // 
+	}
+	else if (kb.pressing('ArrowRight')) {
+		if (van.direction != DIRECTION.RIGHT) {
+			buttonHeldTime = 0;
+			van.direction  = DIRECTION.RIGHT;
+			ani.frame = 2;
+		}
+		van.vanX += min(0.2 * buttonHeldTime, 10);
+		buttonHeldTime++;
+	}
+	else {
+		if (van.direction != DIRECTION.CENTER) {
+			buttonHeldTime = 0;
+			van.direction  = DIRECTION.CENTER;
+			ani.frame = 1;
+		}
+	}
+
+	// add or remove acceleration based on button press
+	if (kb.pressing('ArrowUp')) {
+		van.acceleration = min(van.acceleration + 0.01, 0.5);
+		van.vanY -= van.acceleration;
+	} 
+	else if (kb.pressing('ArrowDown')) {
+		van.acceleration = max(van.acceleration - 0.01, -0.5);
+		van.vanY -= van.acceleration;
+	} 
+	else {
+		// kinda lerp to acceleration to 0 if button not pressed
+		if (van.acceleration > 0) {
+			van.acceleration = max(van.acceleration - 0.1, 0);
+		} 
+		else if (van.acceleration < 0) {
+			van.acceleration = min(van.acceleration + 0.1, 0);
+		}
+		// return to middle smoothly
+		van.vanY += (0 - van.vanY) * 0.05; 
+	}
 }
