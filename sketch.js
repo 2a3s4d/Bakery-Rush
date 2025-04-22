@@ -383,13 +383,8 @@ function handleButtonPress () {
 		van.y += (0 - van.y) * 0.05; 
 	}
 
-	if (kb.pressed('p')) {
-		if (gameState == GAME_STATE.PAUSED) {
-			gameState = GAME_STATE.PLAYING;
-		}
-		else if (gameState == GAME_STATE.PLAYING) {
-			gameState = GAME_STATE.PAUSED;
-		}
+	if (kb.pressed('q')) {
+			gameState = GAME_STATE.MAIN_MENU;
 	}
 	if (kb.pressed('Space')) {
 		if (dropDistance <= 0 && dropDistance >= -1000) {
