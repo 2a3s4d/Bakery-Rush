@@ -7,175 +7,369 @@ const DIRECTION = { // direction "enum"
 const GAME_STATE = { // Game state "enum"
 	MAIN_MENU: 0,
 	IN_GAME: 1,
-	CRASHED: 2
+	CRASHED: 2,
+	PAUSED: 3,
+	DEATH_SCREEN: 4
 };
 
 const van = { // van data
 	direction: DIRECTION.CENTER,
-	vanX: 0,
-	vanY: 0,
-	speed: 60,
-	acceleration: 0
+	x: 0,
+	y: 0,
+	speed: 7.5,
+	acceleration: 0,
+	distance: 0,
+	collider: null,
+	ani: null,
 };
-
-let obstacleCars = [];
-let obstacleSpawnTimer = 0;
-
-var minSpeed = 10
-var maxSpeed = 200;
-
-let ani;
+// van min and max speeds
+var minSpeed = 5;
+var maxSpeed = 10;
+let vanSprite;
+// make van in middle of screen
 let vanAnchorX;
 let vanAnchorY;
-let roadAni;
+
+// other car array + timer
+let cars = [];
+let carSpawnTimer = 0;
+
+// for left and right movement
 var buttonHeldTime = 0;
 
-let roadMarkersY = 0;
+let roadOffset = 0; // scroll road
 
-let gameState = GAME_STATE.PLAYING;
+let gameState = GAME_STATE.MAIN_MENU;
+
+// fade when crashed
+let fadeOpacity = -150;
+let fading = false;
+
+let dropDistance;
+let dropSide = DIRECTION.LEFT;
+
+let points = 0;
+
+let highScore = 0;
 
 function preload () {
 	// preload because otherwise it breaks sometimes
-	vanAnims = loadImage("Sprites/BakeryRush_Van-Sheet.png");
-	cityAnim = loadImage("Sprites/CityBackground.png");
-	roadAnim = loadImage("Sprites/Road_Sprite.png");
-	roadMarkers = loadImage("Sprites/Road_Markers.png");
-	carSprites = loadImage("Sprites/Cars.png");
+	vanAnims = loadImage("Sprites/BakeryRushVan_TopDown.png");
+	roadImage = loadImage("Sprites/Road_TopDown.png");
+	carSprites = loadImage("Sprites/Cars_TopDown.png");
+	cookieImage = loadImage("Sprites/Cookie.png");
 }
 
 function setup() {
 	new Canvas(windowWidth, windowHeight, "pixelated");
-
-	ani = loadAni(vanAnims, {width: 256, height: 256, frames: 3});
-	ani.pause();
-	ani.frame = 1;
-	roadAni = loadAni(roadAnim, {width: 768, height: 512, frames: 1});
-	roadAni.scale.x = 2	;
-	roadAni.scale.y = 1.2;
-	roadAni.frameDelay = 20;
+	van.ani = loadAni(vanAnims, {width: 256, height: 256, frames: 3});
+	van.ani.pause();
+	van.ani.frame = 1;
+	van.collider = new Sprite(0, 0, van.ani.width / 2, van.ani.height / 2, STATIC);
+	van.collider.visible = false;
 
 	carAni = loadAni(carSprites, {width: 256, height: 256, frames: 4});
 	carAni.pause();
 
-	cityAni = loadAni(cityAnim, {width: 768, height: 512, frames: 1});
-	cityAni.scale.x = 2	;
-	cityAni.scale.y = 1.2;
-	vanAnchorX = (windowWidth / 2);
-	vanAnchorY = windowHeight - roadAni.height / 2;
-	//roadAni.scale.y = 2;
+	vanAnchorX = windowWidth / 2;
+	vanAnchorY = windowHeight / 2;
+	droppedGoods = new Group();
+	// debug text
 	textSize(20);
 	frameRate(60);
 }
 
 function update() {
+	
 	background('lavender')
 	//clear();
-	if (gameState == GAME_STATE.PLAYING) {
-		animation(roadAni, (windowWidth / 2), windowHeight - (roadAni.height * roadAni.scale.y) / 2);
-		image(roadMarkers, (windowWidth / 2), roadMarkersY, 8, 768)
-		image(roadMarkers, (windowWidth / 2), windowHeight - (roadAni.height * roadAni.scale.y) + roadMarkersY, 8, 768)
-		roadMarkersY += lerp(1, 10, van.speed / 200);
+	if (gameState == GAME_STATE.MAIN_MENU) {
+		drawMainMenu();
+	}
+	else if (gameState == GAME_STATE.PLAYING) {
+		if (dropDistance == null) {
+			dropDistance = floor(10000 + random(-5 * 500, 5 * 500));
+			if (random(0, 2) <= 1) {
+				dropSide = DIRECTION.LEFT;
+			}
+			else {
+				dropSide = DIRECTION.RIGHT;
+			}
+		}
+		drawRoad();
 		
-		animation(cityAni, (windowWidth / 2), (cityAni.height * cityAni.scale.y) / 8);
+		handleButtonPress();
+
+		// draw image from group
+		for (let i = droppedGoods.length - 1; i >= 0; i--) { // decrementing better for removing items
+			let box = droppedGoods[i];
+			box.position.x += box.velocity.x;
+			box.position.y += box.velocity.y;
+			box.rotation += box.rotationSpeed;
+		
+			box.velocity.y += 0.3;
+		
+			push();
+			translate(box.position.x, box.position.y);
+			rotate(box.rotation);
+			imageMode(CENTER);
+			image(cookieImage, 0, 0);
+			pop();
+		
+			box.life--;
+			if (box.life <= 0) {
+				droppedGoods.splice(i, 1);
+			}
+		}
 		
 		// DEBUG TEXT
-		text(van.acceleration, 12, 30, 20, 6);
-		text(van.speed, 12, 50, 20, 6);
+		textAlign(LEFT, CENTER);
+		fill(0);
+		text(`Drop Distance: ${floor(dropDistance)}`, 10, 30);
+		text(`Points: ${points}`, 10, 60);
 
-		handleButtonPress()
-		
-		// set van speed based of acceleration
-		van.speed = constrain(van.speed + van.acceleration, minSpeed, maxSpeed);
-		//roadAni.frameDelay = ceil(lerp(25, 3, van.speed / maxSpeed));
-		//print(ceil(lerp(3, 25, van.speed / maxSpeed)));
-
-		// make van not go off screen
-		van.vanY = constrain(van.vanY, -windowHeight / 10, windowHeight / 10);
-		van.vanX = constrain(van.vanX, -windowWidth / 4, windowWidth / 4);
 
 		// draw van
-		animation(ani, vanAnchorX + van.vanX, vanAnchorY + van.vanY);
+		drawVan();
 
-		obstacleSpawnTimer--;
-		if (obstacleSpawnTimer <= 0) {
+		handleCars();
+
+		handleGoal();
+
+		if (dropDistance < -1000) {
+			dropDistance = null;
+		}
+		
+	}
+	else if (gameState == GAME_STATE.CRASHED) {
+		// not using draw road since the offset lerp is still above 0 and it looks werid
+		image(roadImage, (windowWidth / 2) - 512, roadOffset - 1920, 1024, 1920);
+		image(roadImage, (windowWidth / 2) - 512, roadOffset, 1024, 1920);
+		drawVan();
+		carSpawnTimer--;
+		if (carSpawnTimer <= 0) {
 			spawnObstacle();
-			obstacleSpawnTimer = 60 + random(30); // spawn new car at variable time
+			carSpawnTimer = 60 + random(30); // spawn new car at variable time
 		}
 
-		// draw obstacles
-		for (let i = obstacleCars.length - 1; i >= 0; i--) {
-			let obs = obstacleCars[i];
+		// didn't use handleCars because not detecting collision and not using relative speed
+		for (let i = cars.length - 1; i >= 0; i--) {
+			let car = cars[i];
 		
 			// adjust Y gain relative on vans speed
-			let relativeSpeed = obs.baseSpeed - van.speed;
-			obs.y -= relativeSpeed;
+			car.y -= car.speed;
 			
-			// Draw obstacle
-			//fill('red');
-			carAni.frame = obs.spriteIndex;
+			// draw car based on colour
+			carAni.frame = car.spriteIndex;
+
+			animation(carAni, car.x, car.y);
+			car.collider.x = car.x;
+			car.collider.y = car.y;
 			
-			animation(carAni, obs.x, obs.y);
+		}
+		if (fading) { // fade camera after a second or so
 		
-			// Remove if offscreen
-			if (obs.y + obs.height < windowHeight - (roadAni.height * roadAni.scale.y)) {
-				obstacleCars.splice(i, 1);
+			if (fadeOpacity < 255) {
+				fill(0, fadeOpacity);
+				rect(0, 0, width, height);
+				fadeOpacity += 5;
+			} else {
+				// Fade completed switch back to main menu
+				fadeOpacity = 0;
+				fading = false;
+				gameState = GAME_STATE.MAIN_MENU;
+				cars = [];
 			}
+		}
+		
+	}
+	
+}
+
+function drawMainMenu() {
+	textAlign(CENTER, CENTER);
+	textSize(48);
+	fill(0);
+	text("Bakery Rush", width / 2, height / 2 - 100);
+  
+	// draw play button
+	if (mouse.x > width / 2 - 80 && mouse.x < width / 2 + 80 &&
+		mouse.y > height / 2 - 10 && mouse.y < height / 2 + 50) {
+		fill(230, 230, 230);
+	}
+	else {
+		fill(255, 255, 255);
+	}
+	
+	rectMode(CENTER);
+	rect(width / 2, height / 2 + 20, 160, 60, 10);
+  
+	// Button text
+	fill(0);
+	textSize(24);
+	text("Play", width / 2, height / 2 + 20);
+  
+	// handle click with bounds (createButton was being weird)
+	if (mouseIsPressed &&
+		mouse.x > width / 2 - 80 && mouse.x < width / 2 + 80 &&
+		mouse.y > height / 2 - 10 && mouse.y < height / 2 + 50) {
+		rectMode(CORNER);
+		gameState = GAME_STATE.PLAYING;
+	}
+
+	text(`High Score ${highScore}`, width / 2, height / 2 + 80);
+}
+
+function drawVan() {
+	van.speed = constrain(van.speed + van.acceleration, minSpeed, maxSpeed);
+
+	// make van not go off screen
+	van.y = constrain(van.y, -windowHeight / 8, windowHeight / 8);
+	van.x = constrain(van.x, -330, 330);
+	animation(van.ani, vanAnchorX + van.x, vanAnchorY + van.y);
+	van.collider.x = vanAnchorX + van.x;
+	van.collider.y = vanAnchorY + van.y;
+	van.distance += van.speed;
+}
+
+function drawRoad () {
+	image(roadImage, (windowWidth / 2) - 512, roadOffset - 1920, 1024, 1920);
+	image(roadImage, (windowWidth / 2) - 512, roadOffset, 1024, 1920);
+	roadOffset = (roadOffset + lerp(5, 7, van.speed - 5, 5)) % 1920;
+}
+
+function handleCars () {
+	carSpawnTimer--;
+	if (carSpawnTimer <= 0) {
+		spawnObstacle();
+		carSpawnTimer = 60 + random(30); // spawn new car at variable time
+	}
+
+	// draw cars
+	for (let i = cars.length - 1; i >= 0; i--) {
+		let car = cars[i];
+	
+		// adjust Y gain relative on vans speed
+		let relativeSpeed = car.speed - van.speed;
+		car.y -= relativeSpeed;
+		
+		// draw car based on colour
+		carAni.frame = car.spriteIndex;
+
+		animation(carAni, car.x, car.y);
+		car.collider.x = car.x;
+		car.collider.y = car.y;
+		
+		if (car.collider.colliding(van.collider)) {
+			if (points > highScore) {
+				highScore = points;
+			}
+			car.speed = 0;
+			van.speed = 0;
+			gameState = GAME_STATE.CRASHED;
+			fading = true;
 		}
 	}
 }
 
+function handleGoal () {
+	dropDistance -= van.speed;
+
+	// Arrow warning appears when within 10,000 units of drop
+	if (dropDistance < 2500 && dropDistance > 0) {
+		fill(0);
+		noStroke();
+		textSize(32);
+		textAlign(CENTER, CENTER);
+		
+		if (dropSide == DIRECTION.LEFT) {
+			text("← DROP", 100, height / 2); // left side
+		} else if (dropSide == DIRECTION.RIGHT) {
+			text("DROP →", width - 100, height / 2); // right side
+		}
+	}
+
+	// Drop zone indicator
+	if (dropDistance <= 0 && dropDistance > -1000) {
+		text("DROP NOW!", 100, height / 2);
+	}
+}
+
+function dropGoods() {
+	let box = createSprite(vanAnchorX + van.x, vanAnchorY + van.y); // Correct position
+	box.addAni('Sprites/Cookie.png', 1);
+
+	let force = 10;
+	box.velocity.x = (dropSide == DIRECTION.LEFT) ? -force : force; // ternary operator because of coolness reasons
+	box.velocity.y = -5;
+	box.rotationSpeed = random(-10, 10);
+	box.life = 60;
+
+	droppedGoods.add(box);
+
+	if (dropSide == DIRECTION.LEFT && van.x <= -225) {
+		points += 1;
+	}
+	else if (dropSide == DIRECTION.RIGHT && van.x >= 225) {
+		points += 1;
+	}
+
+}
+
 function spawnObstacle() {
-	const laneOffsets = [-windowWidth / 4, 0, windowWidth / 4]; // LEFT, CENTER, RIGHT lanes
+	const laneOffsets = [-300, 0, 300]; // LEFT, CENTER, RIGHT lanes
 	let lane = floor(random(0, 3));
-	let obs = {
-		//sprite: new Sprite(),
+	let car = {
 		x: (windowWidth / 2) + laneOffsets[lane],
 		y: windowHeight + 50,
-		width: 60,
-		height: 100,
-		baseSpeed: random(van.speed - 5, van.speed + 5),
+		speed: van.speed + 2,
+		collider: null,
 		spriteIndex: round(random(0, 3))
 	};
-	obstacleCars.push(obs);
+	car.collider = new Sprite(0, 0, van.ani.width / 2, van.ani.height / 2, DYNAMIC);
+	car.collider.visible = false;
+	cars.push(car);
 }
 
 function handleButtonPress () {
 	// update van animation frame and direction based off button press
-	if (kb.pressing('ArrowLeft')) {
+	if (kb.pressing('ArrowLeft') || kb.pressing('a')) {
 		if (van.direction != DIRECTION.LEFT) {
 			buttonHeldTime = 0;
 			van.direction  = DIRECTION.LEFT;
-			ani.frame = 0;
+			van.ani.frame = 0;
+
 		}
 		// update position based on how long button has been pressed
-		van.vanX -= min(0.2 * buttonHeldTime, 10);
+		van.x -= min(0.2 * buttonHeldTime, 10);
 		buttonHeldTime++; // 
 	}
-	else if (kb.pressing('ArrowRight')) {
+	else if (kb.pressing('ArrowRight') || kb.pressing('d')) {
 		if (van.direction != DIRECTION.RIGHT) {
 			buttonHeldTime = 0;
 			van.direction  = DIRECTION.RIGHT;
-			ani.frame = 2;
+			van.ani.frame = 2;
+
 		}
-		van.vanX += min(0.2 * buttonHeldTime, 10);
+		van.x += min(0.2 * buttonHeldTime, 10);
 		buttonHeldTime++;
 	}
 	else {
 		if (van.direction != DIRECTION.CENTER) {
 			buttonHeldTime = 0;
 			van.direction  = DIRECTION.CENTER;
-			ani.frame = 1;
+			van.ani.frame = 1;
 		}
 	}
 
 	// add or remove acceleration based on button press
-	if (kb.pressing('ArrowUp')) {
+	if (kb.pressing('ArrowUp') || kb.pressing('w')) {
 		van.acceleration = min(van.acceleration + 0.01, 0.5);
-		van.vanY -= van.acceleration;
+		van.y -= van.acceleration;
 	} 
-	else if (kb.pressing('ArrowDown')) {
+	else if (kb.pressing('ArrowDown') || kb.pressing('s')) {
 		van.acceleration = max(van.acceleration - 0.01, -0.5);
-		van.vanY -= van.acceleration;
+		van.y -= van.acceleration;
 	} 
 	else {
 		// kinda lerp to acceleration to 0 if button not pressed
@@ -186,6 +380,20 @@ function handleButtonPress () {
 			van.acceleration = min(van.acceleration + 0.1, 0);
 		}
 		// return to middle smoothly
-		van.vanY += (0 - van.vanY) * 0.05; 
+		van.y += (0 - van.y) * 0.05; 
+	}
+
+	if (kb.pressed('p')) {
+		if (gameState == GAME_STATE.PAUSED) {
+			gameState = GAME_STATE.PLAYING;
+		}
+		else if (gameState == GAME_STATE.PLAYING) {
+			gameState = GAME_STATE.PAUSED;
+		}
+	}
+	if (kb.pressed('Space')) {
+		if (dropDistance <= 0 && dropDistance >= -1000) {
+			dropGoods();
+		}
 	}
 }
