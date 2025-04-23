@@ -39,6 +39,7 @@ var buttonHeldTime = 0;
 
 let roadOffset = 0; // scroll road
 
+// game state
 let gameState = GAME_STATE.MAIN_MENU;
 
 // fade when crashed
@@ -53,7 +54,7 @@ let points = 0;
 let highScore = 0;
 
 function preload () {
-	// preload because otherwise it breaks sometimes
+	// preload images
 	vanAnims = loadImage("Sprites/BakeryRushVan_TopDown.png");
 	roadImage = loadImage("Sprites/Road_TopDown.png");
 	carSprites = loadImage("Sprites/Cars_TopDown.png");
@@ -74,9 +75,10 @@ function setup() {
 	vanAnchorX = windowWidth / 2;
 	vanAnchorY = windowHeight / 2;
 	droppedGoods = new Group();
-	// debug text
+	/* not really needed but oh wedebug text
 	textSize(20);
 	frameRate(60);
+	*/
 }
 
 function update() {
@@ -179,6 +181,9 @@ function update() {
 				fading = false;
 				gameState = GAME_STATE.MAIN_MENU;
 				cars = [];
+				van.x = 0;
+				van.speed = 7.5;
+				dropDistance = null;
 			}
 		}
 		
@@ -187,11 +192,9 @@ function update() {
 }
 
 function drawMainMenu() {
+	
 	textAlign(CENTER, CENTER);
-	textSize(48);
-	fill(0);
-	text("Bakery Rush", width / 2, height / 2 - 100);
-  
+	
 	// draw play button
 	if (mouse.x > width / 2 - 80 && mouse.x < width / 2 + 80 &&
 		mouse.y > height / 2 - 10 && mouse.y < height / 2 + 50) {
@@ -200,10 +203,10 @@ function drawMainMenu() {
 	else {
 		fill(255, 255, 255);
 	}
-	
+	stroke(1);
 	rectMode(CENTER);
-	rect(width / 2, height / 2 + 20, 160, 60, 10);
-  
+	rect(windowWidth / 2, windowHeight / 2 + 20, 160, 60, 10); // yargg
+	noStroke();
 	// Button text
 	fill(0);
 	textSize(24);
@@ -218,6 +221,11 @@ function drawMainMenu() {
 	}
 
 	text(`High Score ${highScore}`, width / 2, height / 2 + 80);
+
+	textSize(48);
+	fill(0);
+	text("Bakery Rush", width / 2, height / 2 - 100);
+	textSize(24);
 }
 
 function drawVan() {
