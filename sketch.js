@@ -8,8 +8,8 @@ const GAME_STATE = { // Game state "enum"
 	MAIN_MENU: 0,
 	IN_GAME: 1,
 	CRASHED: 2,
-	PAUSED: 3,
-	DEATH_SCREEN: 4
+	PAUSED: 3, // not used
+	DEATH_SCREEN: 4 // not used
 };
 
 const van = { // van data
@@ -52,6 +52,8 @@ let dropSide = DIRECTION.LEFT;
 let points = 0;
 
 let highScore = 0;
+let gameLength = 120;
+let timeRemaining = 60 * gameLength;
 
 function preload () {
 	// preload images
@@ -75,10 +77,6 @@ function setup() {
 	vanAnchorX = windowWidth / 2;
 	vanAnchorY = windowHeight / 2;
 	droppedGoods = new Group();
-	/* not really needed but oh wedebug text
-	textSize(20);
-	frameRate(60);
-	*/
 }
 
 function update() {
@@ -89,6 +87,16 @@ function update() {
 		drawMainMenu();
 	}
 	else if (gameState == GAME_STATE.PLAYING) {
+
+		if (timeRemaining <= 0) {
+			if (points > highScore) {
+				highScore = points;
+			}
+			van.speed = 0;
+			gameState = GAME_STATE.CRASHED;
+			fading = true;
+		}
+
 		if (dropDistance == null) {
 			dropDistance = floor(10000 + random(-5 * 500, 5 * 500));
 			if (random(0, 2) <= 1) {
@@ -127,8 +135,9 @@ function update() {
 		// DEBUG TEXT
 		textAlign(LEFT, CENTER);
 		fill(0);
-		text(`Drop Distance: ${floor(dropDistance)}`, 10, 30);
-		text(`Points: ${points}`, 10, 60);
+		text(`Time Remaining: ${floor(timeRemaining / 60 )}`,10, 30);
+		text(`Drop Distance: ${floor(dropDistance)}`, 10, 60);
+		text(`Points: ${points}`, 10, 90);
 
 
 		// draw van
@@ -141,6 +150,8 @@ function update() {
 		if (dropDistance < -1000) {
 			dropDistance = null;
 		}
+
+		timeRemaining -= 1;
 		
 	}
 	else if (gameState == GAME_STATE.CRASHED) {
@@ -205,7 +216,7 @@ function drawMainMenu() {
 	}
 	stroke(1);
 	rectMode(CENTER);
-	rect(windowWidth / 2, windowHeight / 2 + 20, 160, 60, 10); // yargg
+	rect(windowWidth / 2, windowHeight / 2 + 20, 160, 60); // yargg
 	noStroke();
 	// Button text
 	fill(0);
@@ -218,6 +229,8 @@ function drawMainMenu() {
 		mouse.y > height / 2 - 10 && mouse.y < height / 2 + 50) {
 		rectMode(CORNER);
 		gameState = GAME_STATE.PLAYING;
+		timeRemaining = 60 * gameLength;
+		let points = 0;
 	}
 
 	text(`High Score ${highScore}`, width / 2, height / 2 + 80);
@@ -226,6 +239,13 @@ function drawMainMenu() {
 	fill(0);
 	text("Bakery Rush", width / 2, height / 2 - 100);
 	textSize(24);
+
+
+	text("How to play", windowWidth / 2, height / 2 + 100);
+	text("Arrow keys to move, accelerate and decelerate", windowWidth / 2, height / 2 + 160)
+	text("\"DROP\" will appear on the side where you have to drop off the cookies", windowWidth / 2, height / 2 + 190)
+	text("Move to the corresponding lane and click space while \"Drop Distance\" is negative", windowWidth / 2, height / 2 + 220)
+	text("The game will end if you crash or when the remaining time goes to 0", windowWidth / 2, height / 2 + 250)
 }
 
 function drawVan() {
